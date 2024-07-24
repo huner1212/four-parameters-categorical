@@ -1,0 +1,69 @@
+---
+title: "Four Parameters: Categorical"
+author: "Hunter Stephens"
+format: html
+execute:
+        echo: false
+---
+```{r}
+#| label: setup
+#| message: FALSE
+library(primer.data)
+library(tidyverse)
+library(tidybayes)
+library(brms)
+```
+
+```{r}
+#| label: plot
+ndata <- tibble(sex = c("Female", "Male"))
+fit_nes |> 
+  add_epred_draws(newdata = ndata) |> 
+  select(sex, .category, .epred) |> 
+  ggplot(aes(x = .epred, fill = sex)) + 
+  geom_histogram(bins = 100) + 
+  facet_grid(~ .category) + 
+  scale_x_continuous(breaks = c(0.05, 0.3, 0.6), labels = scales::percent_format()) + 
+  labs(title = "Posterior for Expected Probability of Candidate Support Amoung Women", subtitle = "Women are most likely to support clinton", y = "Count", x = "Posterior Probability of Expected Vote Probability", fill = "Sex")
+```
+
+we have sorted the data of presidential votes into a preceptor table. we are trying to see the votes of people with a covariate of sex. one problem is that people did not give their data at the same time. this could lead to an event happening which changes their mind before they vote. we used a modeling approach where we generated a larger sample size based off of how sex has affected the votes. sex has had a positive correlation to who was being voted due to womans rights not being as equal at hte time. one Qol was the vote. one uncetainty of this Qol could be that some people were less popular and the assumption of representativeness might not hold.
+
+\begin{aligned}
+\rho_{clinton} &=& \frac{e^{\beta_{0, clinton} + \beta_{1, clinton} male}}{1 + e^{\beta_{0, clinton} + \beta_{1, clinton} male}}\\
+\rho_{perot} &=& \frac{e^{\beta_{0, perot} + \beta_{1, perot} male}}{1 + e^{\beta_{0, perot} + \beta_{1, perot} male}}\\
+\rho_{bush}  &=& 1 - \rho_{clinton} - \rho_{perot}
+\end{aligned}
+
+```{r}
+#| label: cleaning
+#| message: FALSE
+nes_92 <-
+  nes |> 
+    filter(year == 1992) |>
+    select(pres_vote, sex) |>
+    drop_na() |> 
+    mutate(pres_vote = case_when(
+      pres_vote == "Democrat" ~ "Clinton",
+      pres_vote == "Republican" ~ "Bush",
+      pres_vote == "Third Party" ~ "Perot"
+    ))
+
+```
+
+```{r}
+#| label: model
+#| cache: TRUE
+fit_nes <- brm(formula = pres_vote ~ sex,
+               data = nes_92,
+               family = categorical(),
+               silent = 2,
+               refresh = 0,
+               seed = 76)
+```
+
+```{r}
+#| label: table
+tbl_regression(fit_nes)
+```
+
